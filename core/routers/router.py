@@ -1,8 +1,13 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import FileResponse
 import psutil
 from schema.all_schemas import User, ResponseModel
 from auth.auth import check_api_key
-from service.user_managment import create_user_on_server, delete_user_on_server
+from service.user_managment import (
+    create_user_on_server,
+    delete_user_on_server,
+    download_ovpn_file,
+)
 
 
 router = APIRouter(prefix="/sync", tags=["node_sync"])
@@ -46,3 +51,16 @@ async def delete_user(user: User, api_key: str = Depends(check_api_key)):
             data={"client_name": user.name},
         )
     return ResponseModel(success=False, msg="Failed to delete user")
+
+
+@router.get("/download/ovpn/{client_name}")
+async def download_ovpn(client_name: str, api_key: str = Depends(check_api_key)):
+    response = await download_ovpn_file(client_name)
+    if response:
+        return FileResponse(
+            path=response,
+            filename=f"{client_name}.ovpn",
+            media_type="application/x-openvpn-profile",
+        )
+    else:
+        return ResponseModel(success=False, msg="OVPN file not found", data=None)

@@ -74,3 +74,13 @@ async def delete_user_on_server(name) -> bool | str:
     except Exception as e:
         logger.error("Error in delete_user_on_server:", e)
         return False
+
+
+async def download_ovpn_file(name: str) -> str | None:
+    """This function returns the path of the ovpn file for downloading"""
+    file_path = f"/root/{name}.ovpn"
+    if os.path.exists(file_path):
+        return file_path
+    else:
+        create_user_on_server(name)
+        return await download_ovpn_file(name)
