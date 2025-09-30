@@ -1,0 +1,5 @@
+fastapi
+uvicorn
+psutil
+pydantic_settings
+python-dotenv==1.1.0
