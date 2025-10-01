@@ -1,20 +1,27 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 import psutil
-from schema.all_schemas import User, ResponseModel
+from schema.all_schemas import User, ResponseModel, SetSettingsModel
 from auth.auth import check_api_key
 from service.user_managment import (
     create_user_on_server,
     delete_user_on_server,
     download_ovpn_file,
 )
+from setting.core import change_config
 
 
 router = APIRouter(prefix="/sync", tags=["node_sync"])
 
 
-@router.get("/get-status", response_model=ResponseModel)
-async def get_status(api_key: str = Depends(check_api_key)):
+@router.post("/get-status", response_model=ResponseModel)
+async def get_status(request: SetSettingsModel, api_key: str = Depends(check_api_key)):
+    """Get the current status of the node and set ovpn settings"""
+    if request.set_new_setting:
+        change_settings = change_config(request)
+        if not change_settings:
+            return ResponseModel(success=False, msg="Failed to change settings")
+
     status = {"status": "running"}
     cpu_usage = psutil.cpu_percent()
     memory_info = psutil.virtual_memory()

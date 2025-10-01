@@ -10,3 +10,10 @@ class ResponseModel(BaseModel):
     success: bool
     msg: str
     data: Optional[Any] = None
+
+
+class SetSettingsModel(BaseModel):
+    tunnel_address: str
+    protocol: str
+    ovpn_port: int
+    set_new_setting: bool
