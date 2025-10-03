@@ -4,7 +4,7 @@ import uvicorn
 from routers import core_router
 from config import settings
 
-api = FastAPI()
+api = FastAPI(docs_url=None)
 
 api.include_router(core_router)
 
