@@ -104,10 +104,8 @@ def update_ovnode():
             shutil.move(backup_env, env_file)
 
         print(Fore.YELLOW + "Installing requirements..." + Style.RESET_ALL)
-        subprocess.run(
-            ["pip", "install", "-r", "requirements.txt"],
-            check=True,
-        )
+        os.chdir(install_dir)
+        subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
 
         subprocess.run(["systemctl", "restart", "ov-node"], check=True)
 
