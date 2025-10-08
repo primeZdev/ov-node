@@ -1,6 +1,8 @@
 import logging
 import os
 
+from config import settings
+
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 LOG_FILE = os.path.join(os.path.dirname(BASE_DIR), "data", "app.log")
 
@@ -13,7 +15,7 @@ logging.basicConfig(
     format="{asctime} - {levelname} - {message}",
     style="{",
     datefmt="%Y-%m-%d %H:%M",
-    level=logging.INFO,
+    level=settings.debug,
 )
 
 logger = logging.getLogger("AppLogger")
