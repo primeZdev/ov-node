@@ -10,8 +10,8 @@ script_path = "/root/openvpn-install.sh"
 
 def create_user_on_server(name) -> bool:
     try:
-        pexpect.spawn("chmod +x openvpn-install.sh", encoding="utf-8")
-        bash = pexpect.spawn(f"bash {script_path}", encoding="utf-8", timeout=60)
+        os.system(f"chmod +x {script_path}")
+        bash = pexpect.spawn(f"sudo bash {script_path}", encoding="utf-8", timeout=60)
 
         bash.expect("Option:")
         bash.sendline("1")
@@ -32,8 +32,8 @@ def create_user_on_server(name) -> bool:
 
 async def delete_user_on_server(name) -> bool | str:
     try:
-        pexpect.spawn("chmod +x openvpn-install.sh", encoding="utf-8")
-        bash = pexpect.spawn(f"bash {script_path}", encoding="utf-8", timeout=60)
+        os.system(f"chmod +x {script_path}")
+        bash = pexpect.spawn(f"sudo bash {script_path}", encoding="utf-8", timeout=60)
 
         bash.expect("Option:")
         bash.sendline("2")
