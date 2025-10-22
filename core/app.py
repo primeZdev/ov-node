@@ -4,8 +4,11 @@ import uvicorn
 from routers import core_router
 from config import settings
 from logger import logger
+from version import __version__
 
-api = FastAPI(docs_url=None)
+api = FastAPI(title="OV Node",
+            version=__version__,
+            docs_url="/doc" if settings.doc else None)
 
 api.include_router(core_router)
 
