@@ -14,58 +14,58 @@ def install_ovnode():
         )  # thanks to Nyr for ovpn installation script <3 https://github.com/Nyr/openvpn-install
 
         bash = pexpect.spawn(
-            "bash /root/openvpn-install.sh", encoding="utf-8", timeout=300
+            "/usr/bin/bash", ["/root/openvpn-install.sh"], encoding="utf-8", timeout=180
         )
-        subprocess.run("clear")
-        print("Please wait while the prerequisites are installed...")
+        print("Running OpenVPN installer...")
 
-        bash.expect("Which IPv4 address should be used")
-        bash.sendline("1")
+        prompts = [
+            (r"Which IPv4 address should be used.*:", "1"),
+            (r"Protocol.*:", "2"),
+            (r"Port.*:", "1194"),
+            (r"Select a DNS server for the clients.*:", "1"),
+            (r"Enter a name for the first client.*:", "first_client"),
+            (r"Press any key to continue...", ""),
+        ]
 
-        bash.expect("Which protocol should OpenVPN use")
-        bash.sendline("2")
+        for pattern, reply in prompts:
+            try:
+                bash.expect(pattern, timeout=10)
+                bash.sendline(reply)
+            except pexpect.TIMEOUT:
+                pass
 
-        bash.expect("What port should OpenVPN listen on")
-        bash.sendline("1194")
-
-        bash.expect("Select a DNS server for the clients")
-        bash.sendline("1")
-
-        bash.expect("Enter a name for the first client")
-        bash.sendline("first_client")
-
-        bash.expect("Press any key to continue")
-        bash.sendline("")
-
-        bash.expect("Finished!")
-        bash.expect(pexpect.EOF)
-        subprocess.run("clear")
+        bash.expect(pexpect.EOF, timeout=None)
+        bash.close()
 
         shutil.copy(".env.example", ".env")
+
+        # OV-Node configuration prompts
         example_uuid = str(uuid4())
-        service_port = input("Enter the service port (default 9090): ") or "9090"
-        api_key = (
-            input(f"Enter the API key (example: {example_uuid}): ") or example_uuid
-        )
+        SERVICE_PORT = input("OV-Node service port (default 9090): ") or "9090"
+        API_KEY = input(f"OV-Node API key (example: {example_uuid}): ") or example_uuid
+
+        replacements = {
+            "SERVICE_PORT": SERVICE_PORT,
+            "API_KEY": API_KEY,
+        }
+
+        lines = []
+        with open(".env", "r") as f:
+            for line in f:
+                for key, value in replacements.items():
+                    if line.startswith(f"{key}="):
+                        line = f"{key}={value}\n"
+                lines.append(line)
 
         with open(".env", "w") as f:
-            f.write(f"SERVICE_PORT={service_port}\n")
-            f.write(f"API_KEY={api_key}\n")
-
-        subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
+            f.writelines(lines)
 
         run_ovnode()
-        input(
-            Fore.GREEN
-            + "Installation completed successfully! Press Enter to return to the menu..."
-            + Style.RESET_ALL
-        )
+        input("Press Enter to return to the menu...")
         menu()
 
     except Exception as e:
-        print(
-            Fore.RED + "Error occurred during installation: " + str(e) + Style.RESET_ALL
-        )
+        print("Error occurred during installation:", e)
         input("Press Enter to return to the menu...")
         menu()
 
