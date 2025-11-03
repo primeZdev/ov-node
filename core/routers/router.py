@@ -50,7 +50,7 @@ async def create_user(user: User, api_key: str = Depends(check_api_key)):
 
 @router.post("/delete-user", response_model=ResponseModel)
 async def delete_user(user: User, api_key: str = Depends(check_api_key)):
-    result = await delete_user_on_server(user.name)
+    result = delete_user_on_server(user.name)
     if result:
         return ResponseModel(
             success=True,
