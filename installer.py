@@ -9,35 +9,38 @@ from colorama import Fore, Style
 
 def install_ovnode():
     try:
-        subprocess.run(
-            ["wget", "https://git.io/vpn", "-O", "/root/openvpn-install.sh"], check=True
-        )  # thanks to Nyr for ovpn installation script <3 https://github.com/Nyr/openvpn-install
+        # Get the current script directory
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        project_ovpn_script = os.path.join(script_dir, "openvpn-install.sh")
+        target_ovpn_script = "/root/openvpn-install.sh"
+        
+        # Copy openvpn-install.sh from current directory to /root/
+        if os.path.exists(project_ovpn_script):
+            print("Using openvpn-install.sh from project directory...")
+            shutil.copy(project_ovpn_script, target_ovpn_script)
+            # Make sure the script is executable
+            os.chmod(target_ovpn_script, 0o755)
+        else:
+            print("openvpn-install.sh not found in project, downloading...")
+            subprocess.run(
+                ["wget", "https://git.io/vpn", "-O", target_ovpn_script], check=True
+            )
 
-        bash = pexpect.spawn(
-            "/usr/bin/bash", ["/root/openvpn-install.sh"], encoding="utf-8", timeout=180
-        )
+        # Run the OpenVPN installer script (now with automated defaults)
         print("Running OpenVPN installer...")
+        subprocess.run(
+            ["/usr/bin/bash", target_ovpn_script],
+            check=True
+        )
 
-        prompts = [
-            (r"Which IPv4 address should be used.*:", "1"),
-            (r"Protocol.*:", "2"),
-            (r"Port.*:", "1194"),
-            (r"Select a DNS server for the clients.*:", "1"),
-            (r"Enter a name for the first client.*:", "first_client"),
-            (r"Press any key to continue...", ""),
-        ]
-
-        for pattern, reply in prompts:
-            try:
-                bash.expect(pattern, timeout=10)
-                bash.sendline(reply)
-            except pexpect.TIMEOUT:
-                pass
-
-        bash.expect(pexpect.EOF, timeout=None)
-        bash.close()
-
-        shutil.copy(".env.example", ".env")
+        # Copy .env.example to .env in the current directory
+        env_example = os.path.join(script_dir, ".env.example")
+        env_file = os.path.join(script_dir, ".env")
+        
+        if os.path.exists(env_example):
+            shutil.copy(env_example, env_file)
+        else:
+            print("Warning: .env.example not found")
 
         # OV-Node configuration prompts
         example_uuid = str(uuid4())
@@ -50,14 +53,14 @@ def install_ovnode():
         }
 
         lines = []
-        with open(".env", "r") as f:
+        with open(env_file, "r") as f:
             for line in f:
                 for key, value in replacements.items():
                     if line.startswith(f"{key}="):
                         line = f"{key}={value}\n"
                 lines.append(line)
 
-        with open(".env", "w") as f:
+        with open(env_file, "w") as f:
             f.writelines(lines)
 
         run_ovnode()
@@ -72,40 +75,60 @@ def install_ovnode():
 
 def update_ovnode():
     try:
-        repo = "https://api.github.com/repos/primeZdev/ov-node/releases/latest"
         install_dir = "/opt/ov-node"
+        venv_dir = os.path.join(install_dir, "venv")
         env_file = os.path.join(install_dir, ".env")
         backup_env = "/tmp/ovnode_env_backup"
 
-        response = requests.get(repo)
-        response.raise_for_status()
-        release = response.json()
-
-        download_url = release["tarball_url"]
-        filename = "/tmp/ov-node-latest.tar.gz"
-
-        print(Fore.YELLOW + f"Downloading {download_url}" + Style.RESET_ALL)
-        subprocess.run(["wget", "-O", filename, download_url], check=True)
-
+        # Backup .env file
         if os.path.exists(env_file):
             shutil.copy2(env_file, backup_env)
 
+        # Check if directory exists and is a git repository
         if os.path.exists(install_dir):
-            shutil.rmtree(install_dir)
+            os.chdir(install_dir)
+            if os.path.exists(os.path.join(install_dir, ".git")):
+                print(Fore.YELLOW + "Pulling latest changes from repository..." + Style.RESET_ALL)
+                subprocess.run(["git", "fetch", "--all"], check=True)
+                subprocess.run(["git", "reset", "--hard", "origin/main"], check=True)
+                subprocess.run(["git", "pull", "origin", "main"], check=True)
+            else:
+                # If not a git repo, clone it
+                print(Fore.YELLOW + "Cloning repository..." + Style.RESET_ALL)
+                shutil.rmtree(install_dir)
+                subprocess.run(
+                    ["git", "clone", "https://github.com/primeZdev/ov-node.git", install_dir],
+                    check=True
+                )
+                os.chdir(install_dir)
+        else:
+            # Directory doesn't exist, clone it
+            print(Fore.YELLOW + "Cloning repository..." + Style.RESET_ALL)
+            subprocess.run(
+                ["git", "clone", "https://github.com/primeZdev/ov-node.git", install_dir],
+                check=True
+            )
+            os.chdir(install_dir)
 
-        os.makedirs(install_dir, exist_ok=True)
-
-        subprocess.run(
-            ["tar", "-xzf", filename, "-C", install_dir, "--strip-components=1"],
-            check=True,
-        )
-
+        # Restore .env file
         if os.path.exists(backup_env):
             shutil.move(backup_env, env_file)
 
+        print(Fore.YELLOW + "Creating virtual environment..." + Style.RESET_ALL)
+        if not os.path.exists(venv_dir):
+            subprocess.run(["/usr/bin/python3", "-m", "venv", venv_dir], check=True)
+
         print(Fore.YELLOW + "Installing requirements..." + Style.RESET_ALL)
-        os.chdir(install_dir)
-        subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
+        pip_path = os.path.join(venv_dir, "bin", "pip")
+        subprocess.run([pip_path, "install", "--upgrade", "pip"], check=True)
+        
+        requirements_file = os.path.join(install_dir, "requirements.txt")
+        if os.path.exists(requirements_file):
+            subprocess.run([pip_path, "install", "-r", requirements_file], check=True)
+        else:
+            print(Fore.YELLOW + "requirements.txt not found, installing basic dependencies..." + Style.RESET_ALL)
+            subprocess.run([pip_path, "install", "fastapi", "uvicorn", "psutil", "pydantic_settings", 
+                          "python-dotenv", "colorama", "pexpect", "requests"], check=True)
 
         subprocess.run(["systemctl", "restart", "ov-node"], check=True)
 
@@ -115,6 +138,8 @@ def update_ovnode():
 
     except Exception as e:
         print(Fore.RED + f"Update failed: {e}" + Style.RESET_ALL)
+        input("Press Enter to return to the menu...")
+        menu()
 
 
 def uninstall_ovnode():
@@ -165,10 +190,10 @@ After=network.target
 [Service]
 User=root
 WorkingDirectory=/opt/ov-node/core
-ExecStart=/usr/bin/python3 app.py
+ExecStart=/opt/ov-node/venv/bin/python app.py
 Restart=always
 RestartSec=5
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+Environment="PATH=/opt/ov-node/venv/bin:/usr/local/bin:/usr/bin:/bin"
 
 [Install]
 WantedBy=multi-user.target
