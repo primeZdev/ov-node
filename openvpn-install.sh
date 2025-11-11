@@ -119,9 +119,9 @@ if [[ ! -e /etc/openvpn/server/server.conf ]]; then
 		ip6=$(ip -6 addr | grep 'inet6 [23]' | cut -d '/' -f 1 | grep -oE '([0-9a-fA-F]{0,4}:){1,7}[0-9a-fA-F]{0,4}' | sed -n "$ip6_number"p)
 		echo "Using IPv6 address: $ip6"
 	fi
-	# Automatically use TCP protocol (option 2)
-	protocol=tcp
-	echo "Using protocol: TCP"
+	# Automatically use UDP protocol (option 2)
+	protocol=udp
+	echo "Using protocol: UDP"
 	# Automatically use port 1194
 	port="1194"
 	echo "Using port: $port"
