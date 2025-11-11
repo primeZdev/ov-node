@@ -8,7 +8,7 @@ from core.logger import logger
 script_path = "/root/openvpn-install.sh"
 
 
-def create_user_on_server(name, expiry_date) -> bool:
+def create_user_on_server(name) -> bool:
     try:
         if not os.path.exists(script_path):
             logger.error("script not found on ")

@@ -47,7 +47,7 @@ def install_ovnode():
         bash = pexpect.spawn(
             "/usr/bin/bash", ["/root/openvpn-install.sh"], encoding="utf-8", timeout=180
         )
-        print("Running OpenVPN installer...")
+        print("Running OV-Node installer...")
 
         prompts = [
             (r"Which IPv4 address should be used.*:", "1"),
@@ -148,7 +148,7 @@ def update_ovnode():
 
         print(Fore.YELLOW + "Installing requirements..." + Style.RESET_ALL)
         os.chdir(install_dir)
-        subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
+        subprocess.run(["uv", "sync"], check=True)
 
         subprocess.run(["systemctl", "restart", "ov-node"], check=True)
 
@@ -201,7 +201,7 @@ def uninstall_ovnode():
         bash.expect("Confirm OpenVPN removal")
         bash.sendline("y")
 
-        bash.expect("OpenVPN removed!")
+        bash.expect("OpenVPN and OV-Node removed!")
         print(
             Fore.GREEN
             + "OV-Node uninstallation completed successfully!"
