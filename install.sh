@@ -3,7 +3,7 @@ set -e
 
 APP_NAME="ov-node"
 INSTALL_DIR="/opt/$APP_NAME"
-REPO_URL="https://github.com/VPNOS/ov-panel"
+REPO_URL="https://github.com/VPNOS/ov-node"
 PYTHON="/usr/bin/python3"
 VENV_DIR="$INSTALL_DIR/venv"
 
