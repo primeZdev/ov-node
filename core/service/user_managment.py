@@ -8,7 +8,7 @@ from logger import logger
 script_path = "/root/openvpn-install.sh"
 
 
-def create_user_on_server(name, expiry_date) -> bool:
+def create_user_on_server(name, expiry_date=None) -> bool:
     try:
         if not os.path.exists(script_path):
             logger.error("script not found on ")
@@ -124,5 +124,10 @@ async def download_ovpn_file(name: str) -> str | None:
     if os.path.exists(file_path):
         return file_path
     else:
-        create_user_on_server(name)
-        return await download_ovpn_file(name)
+        # Try to create user if file doesn't exist
+        success = create_user_on_server(name)
+        if success and os.path.exists(file_path):
+            return file_path
+        else:
+            logger.error(f"Failed to create or find OVPN file for {name}")
+            return None
