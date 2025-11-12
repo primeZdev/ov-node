@@ -40,4 +40,5 @@ async def startup_event():
 
 if __name__ == "__main__":
     logger.info("OV-Node is starting...")
-    uvicorn.run("app:api", host="0.0.0.0", port=settings.service_port, reload=True)
+    # Disable reload in production for stability
+    uvicorn.run("app:api", host="0.0.0.0", port=settings.service_port, reload=False)

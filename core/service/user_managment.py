@@ -1,6 +1,7 @@
 import pexpect
 import re
 import os
+import subprocess
 
 from logger import logger
 
@@ -8,8 +9,105 @@ from logger import logger
 script_path = "/root/openvpn-install.sh"
 
 
+def validate_and_fix_ovpn_file(ovpn_file: str) -> bool:
+    """
+    Validate that .ovpn file has correct remote IP address
+    If missing, fix it by getting the public IP
+    
+    Args:
+        ovpn_file: Path to .ovpn file
+        
+    Returns:
+        True if file is valid or fixed successfully, False otherwise
+    """
+    try:
+        with open(ovpn_file, 'r') as f:
+            content = f.read()
+        
+        # Check if remote line is missing IP (format: "remote  1194" or "remote 1194")
+        if re.search(r'^remote\s+\d+$', content, re.MULTILINE) or \
+           re.search(r'^remote\s{2,}\d+$', content, re.MULTILINE):
+            logger.warning(f"OVPN file {ovpn_file} has missing IP in remote directive, fixing...")
+            
+            # Get public IP
+            public_ip = None
+            try:
+                result = subprocess.run(
+                    ["curl", "-s", "-4", "ifconfig.me"],
+                    capture_output=True,
+                    text=True,
+                    timeout=10
+                )
+                if result.returncode == 0 and result.stdout.strip():
+                    public_ip = result.stdout.strip()
+            except:
+                pass
+            
+            if not public_ip:
+                # Try to get from server IP
+                result = subprocess.run(
+                    ["ip", "addr", "show"],
+                    capture_output=True,
+                    text=True,
+                    timeout=5
+                )
+                if result.returncode == 0:
+                    for line in result.stdout.split("\n"):
+                        match = re.search(r'inet\s+(\d+\.\d+\.\d+\.\d+)', line)
+                        if match:
+                            ip = match.group(1)
+                            if not ip.startswith("127.") and not ip.startswith("10.8."):
+                                public_ip = ip
+                                break
+            
+            if not public_ip:
+                logger.error("Cannot get public IP to fix OVPN file")
+                return False
+            
+            # Extract port from remote line
+            port_match = re.search(r'^remote\s+(\d+)$', content, re.MULTILINE)
+            if not port_match:
+                port_match = re.search(r'^remote\s{2,}(\d+)$', content, re.MULTILINE)
+            
+            port = port_match.group(1) if port_match else "1194"
+            
+            # Fix the remote line
+            content = re.sub(
+                r'^remote\s+.*$',
+                f'remote {public_ip} {port}',
+                content,
+                flags=re.MULTILINE
+            )
+            
+            # Write back
+            with open(ovpn_file, 'w') as f:
+                f.write(content)
+            
+            logger.info(f"Fixed OVPN file {ovpn_file} with IP: {public_ip} and port: {port}")
+            return True
+        else:
+            # Check if remote line has valid IP
+            remote_match = re.search(r'^remote\s+(\d+\.\d+\.\d+\.\d+)\s+\d+', content, re.MULTILINE)
+            if remote_match:
+                logger.info(f"OVPN file {ovpn_file} has valid remote directive")
+                return True
+            else:
+                logger.error(f"OVPN file {ovpn_file} has invalid remote directive format")
+                return False
+                
+    except Exception as e:
+        logger.error(f"Error validating OVPN file {ovpn_file}: {e}")
+        return False
+
+
 def create_user_on_server(name, expiry_date=None) -> bool:
     try:
+        # Ensure OpenVPN template is fixed before creating user
+        from setting.core import fix_openvpn_template, fix_openvpn_server_config
+        logger.info("Ensuring OpenVPN configuration is correct before creating user...")
+        fix_openvpn_server_config()
+        fix_openvpn_template()
+        
         # Validate input name
         if not name or not name.strip():
             logger.error("Invalid user name: name cannot be empty")
@@ -69,7 +167,19 @@ def create_user_on_server(name, expiry_date=None) -> bool:
                 logger.info(f"User '{name}' created successfully")
                 bash.expect(pexpect.EOF, timeout=10)
                 bash.close()
-                return True
+                
+                # Validate the generated .ovpn file
+                ovpn_file = f"/root/{name}.ovpn"
+                if os.path.exists(ovpn_file):
+                    if validate_and_fix_ovpn_file(ovpn_file):
+                        logger.info(f"OVPN file for '{name}' validated successfully")
+                        return True
+                    else:
+                        logger.error(f"OVPN file for '{name}' validation failed")
+                        return False
+                else:
+                    logger.error(f"OVPN file not found after creation: {ovpn_file}")
+                    return False
             elif index == 2:
                 # EOF - script finished
                 logger.info(f"Script finished for user '{name}'")
@@ -210,7 +320,12 @@ async def download_ovpn_file(name: str) -> str | None:
     """This function returns the path of the ovpn file for downloading"""
     file_path = f"/root/{name}.ovpn"
     if os.path.exists(file_path):
-        return file_path
+        # Validate and fix the file before returning
+        if validate_and_fix_ovpn_file(file_path):
+            return file_path
+        else:
+            logger.error(f"OVPN file validation failed for {name}")
+            return None
     else:
         # Try to create user if file doesn't exist
         success = create_user_on_server(name)
