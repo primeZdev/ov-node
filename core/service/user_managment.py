@@ -10,6 +10,24 @@ script_path = "/root/openvpn-install.sh"
 
 def create_user_on_server(name, expiry_date=None) -> bool:
     try:
+        # Validate input name
+        if not name or not name.strip():
+            logger.error("Invalid user name: name cannot be empty")
+            return False
+        
+        # Check if client already exists
+        cert_path = f"/etc/openvpn/server/easy-rsa/pki/issued/{name}.crt"
+        if os.path.exists(cert_path):
+            logger.warning(f"User '{name}' already exists")
+            # Check if .ovpn file exists, if yes, consider it success
+            ovpn_path = f"/root/{name}.ovpn"
+            if os.path.exists(ovpn_path):
+                logger.info(f"User '{name}' already exists with valid .ovpn file")
+                return True
+            else:
+                logger.error(f"User '{name}' exists but .ovpn file is missing")
+                return False
+        
         if not os.path.exists(script_path):
             logger.error("script not found on ")
             return False
@@ -26,26 +44,74 @@ def create_user_on_server(name, expiry_date=None) -> bool:
         bash.expect(r"Option:", timeout=90)
         bash.sendline("1")
 
-        bash.expect(r"Name:", timeout=90)
+        # Wait for name prompt - could be first prompt or repeated if invalid
+        index = bash.expect([r"Name:", r"invalid name"], timeout=90)
         bash.sendline(name)
-        bash.expect(pexpect.EOF, timeout=180)
+        
+        # Handle case where name might be invalid and script asks again
+        max_retries = 3
+        retry_count = 0
+        while retry_count < max_retries:
+            index = bash.expect([
+                r"Name:",  # 0 - Script asking for name again (invalid/duplicate)
+                r"added\. Configuration available",  # 1 - Success message
+                pexpect.EOF,  # 2 - Script finished
+                pexpect.TIMEOUT  # 3 - Timeout
+            ], timeout=180)
+            
+            if index == 0:
+                # Script is asking for name again - means duplicate or invalid
+                logger.error(f"User name '{name}' is invalid or already exists in script")
+                bash.close(force=True)
+                return False
+            elif index == 1:
+                # Success message found
+                logger.info(f"User '{name}' created successfully")
+                bash.expect(pexpect.EOF, timeout=10)
+                bash.close()
+                return True
+            elif index == 2:
+                # EOF - script finished
+                logger.info(f"Script finished for user '{name}'")
+                bash.close()
+                return True
+            
+            retry_count += 1
 
-        bash.close()
-        return True
-
-    except pexpect.TIMEOUT:
-        logger.error("Timeout occurred while executing script!")
+        logger.error(f"Max retries reached for user '{name}'")
+        bash.close(force=True)
         return False
-    except pexpect.EOF:
-        logger.error("Script closed earlier than expected!")
+
+    except pexpect.TIMEOUT as e:
+        logger.error(f"Timeout occurred while executing script: {e}")
+        try:
+            bash.close(force=True)
+        except:
+            pass
+        return False
+    except pexpect.EOF as e:
+        logger.error(f"Script closed earlier than expected: {e}")
+        try:
+            bash.close(force=True)
+        except:
+            pass
         return False
     except Exception as e:
         logger.error(f"Error occurred: {e}")
+        try:
+            bash.close(force=True)
+        except:
+            pass
         return False
 
 
 def delete_user_on_server(name) -> bool | str:
     try:
+        # Validate input
+        if not name or not name.strip():
+            logger.error("Invalid user name: name cannot be empty")
+            return False
+        
         if not os.path.exists(script_path):
             logger.error("script not found at %s", script_path)
             return False
@@ -69,8 +135,13 @@ def delete_user_on_server(name) -> bool | str:
         except pexpect.TIMEOUT:
             logger.info("Didn't match full header")
 
-        bash.expect(r"Client:", timeout=20)
-        list_output = bash.before
+        try:
+            bash.expect(r"Client:", timeout=20)
+            list_output = bash.before
+        except pexpect.TIMEOUT:
+            logger.error("Timeout waiting for client list")
+            bash.close(force=True)
+            return False
 
         pattern = re.compile(r"\s*(\d+)\)\s*(.+)")
         matches = pattern.findall(list_output)
@@ -98,7 +169,13 @@ def delete_user_on_server(name) -> bool | str:
         except pexpect.TIMEOUT:
             logger.warning("Confirmation prompt not seen; trying to continue")
 
-        bash.expect(pexpect.EOF, timeout=120)
+        try:
+            bash.expect(pexpect.EOF, timeout=120)
+        except pexpect.TIMEOUT:
+            logger.error("Timeout waiting for script to finish")
+            bash.close(force=True)
+            return False
+            
         bash.close()
 
         # remove local .ovpn file if exists
@@ -113,8 +190,19 @@ def delete_user_on_server(name) -> bool | str:
 
         return True
 
+    except pexpect.TIMEOUT as e:
+        logger.exception("Timeout in delete_user_on_server: %s", e)
+        try:
+            bash.close(force=True)
+        except:
+            pass
+        return False
     except Exception as e:
         logger.exception("Error in delete_user_on_server: %s", e)
+        try:
+            bash.close(force=True)
+        except:
+            pass
         return False
 
 
