@@ -87,10 +87,14 @@ def install_ovnode():
         lines = []
         with open(".env", "r") as f:
             for line in f:
+                replaced = False
                 for key, value in replacements.items():
-                    if line.startswith(f"{key}="):
-                        line = f"{key}={value}\n"
-                lines.append(line)
+                    if line.startswith(f"{key}"):
+                        lines.append(f"{key}={value}\n")
+                        replaced = True
+                        break
+                if not replaced:
+                    lines.append(line)
 
         with open(".env", "w") as f:
             f.writelines(lines)
@@ -199,6 +203,8 @@ def uninstall_ovnode():
 
         bash.expect(pexpect.EOF, timeout=60)
         bash.close()
+
+        pexpect.run("rm -rf /etc/openvpn")
 
         print(
             Fore.GREEN
