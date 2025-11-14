@@ -4,6 +4,7 @@ from typing import Any, Optional
 
 class User(BaseModel):
     name: str
+    status: str = "activate"
 
 
 class ResponseModel(BaseModel):

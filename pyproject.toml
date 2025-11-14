@@ -1,0 +1,17 @@
+[project]
+name = "ov-node"
+version = "1.0.5"
+description = "vpn backend manager for ov-panel"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "psutil",
+    "pydantic_settings",
+    "python-dotenv==1.1.0",
+    "colorama",
+    "pexpect",
+    "requests",
+    "uuid",
+]

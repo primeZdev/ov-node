@@ -1,14 +1,15 @@
 from fastapi import APIRouter, Depends
 from fastapi.responses import FileResponse
 import psutil
-from schema.all_schemas import User, ResponseModel, SetSettingsModel
-from auth.auth import check_api_key
-from service.user_managment import (
+from core.schema.all_schemas import User, ResponseModel, SetSettingsModel
+from core.auth.auth import check_api_key
+from core.service.user_managment import (
     create_user_on_server,
+    change_user_status as change_user_status_on_server,
     delete_user_on_server,
     download_ovpn_file,
 )
-from setting.core import change_config
+from core.setting.core import change_config
 
 
 router = APIRouter(prefix="/sync", tags=["node_sync"])
@@ -58,6 +59,18 @@ async def delete_user(user: User, api_key: str = Depends(check_api_key)):
             data={"client_name": user.name},
         )
     return ResponseModel(success=False, msg="Failed to delete user")
+
+
+@router.post("/change-user-status", response_model=ResponseModel)
+async def change_user_status(user: User, api_key: str = Depends(check_api_key)):
+    result = change_user_status_on_server(user.name, user.status)
+    if result:
+        return ResponseModel(
+            success=True,
+            msg="User status changed successfully",
+            data={"client_name": user.name},
+        )
+    return ResponseModel(success=False, msg="Failed to change user status")
 
 
 @router.get("/download/ovpn/{client_name}")

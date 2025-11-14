@@ -7,7 +7,38 @@ from uuid import uuid4
 from colorama import Fore, Style
 
 
+def create_ccd() -> None:
+    ccd_dir = "/etc/openvpn/ccd"
+    server_conf = "/etc/openvpn/server/server.conf"
+
+    if not os.path.exists(ccd_dir):
+        subprocess.run(["mkdir", "-p", ccd_dir], check=True)
+        subprocess.run(["chmod", "755", ccd_dir], check=True)
+
+        with open(server_conf, "r") as f:
+            lines = f.readlines()
+
+        ccd_line = f"client-config-dir {ccd_dir}\n"
+        ccd_exclusive_line = "ccd-exclusive\n"
+
+        if ccd_line not in lines:
+            lines.append("\n" + ccd_line)
+
+        if ccd_exclusive_line not in lines:
+            lines.append(ccd_exclusive_line)
+        with open(server_conf, "w") as f:
+            f.writelines(lines)
+
+        subprocess.run(
+            ["systemctl", "restart", "openvpn-server@server.service"], check=True
+        )
+
+
 def install_ovnode():
+    if os.path.exists("/etc/openvpn"):
+        print("OV-Node is already installed.")
+        input("Press Enter to continue...")
+        menu()
     try:
         subprocess.run(
             ["wget", "https://git.io/vpn", "-O", "/root/openvpn-install.sh"], check=True
@@ -16,7 +47,7 @@ def install_ovnode():
         bash = pexpect.spawn(
             "/usr/bin/bash", ["/root/openvpn-install.sh"], encoding="utf-8", timeout=180
         )
-        print("Running OpenVPN installer...")
+        print("Running OV-Node installer...")
 
         prompts = [
             (r"Which IPv4 address should be used.*:", "1"),
@@ -36,10 +67,18 @@ def install_ovnode():
 
         bash.expect(pexpect.EOF, timeout=None)
         bash.close()
+        create_ccd()
 
-        shutil.copy(".env.example", ".env")
+        with open("/etc/openvpn/server/server.conf", "a") as f:
+            f.write("client-config-dir /etc/openvpn/ccd\n")
+            f.write("ccd-exclusive\n")
+
+        subprocess.run(
+            ["systemctl", "restart", "openvpn-server@server.service"], check=True
+        )
 
         # OV-Node configuration prompts
+        shutil.copy(".env.example", ".env")
         example_uuid = str(uuid4())
         SERVICE_PORT = input("OV-Node service port (default 9090): ") or "9090"
         API_KEY = input(f"OV-Node API key (example: {example_uuid}): ") or example_uuid
@@ -71,6 +110,10 @@ def install_ovnode():
 
 
 def update_ovnode():
+    if not os.path.exists("/opt/ov-node"):
+        print("OV-Node is not installed.")
+        input("Press Enter to return to the menu...")
+        menu()
     try:
         repo = "https://api.github.com/repos/primeZdev/ov-node/releases/latest"
         install_dir = "/opt/ov-node"
@@ -105,7 +148,7 @@ def update_ovnode():
 
         print(Fore.YELLOW + "Installing requirements..." + Style.RESET_ALL)
         os.chdir(install_dir)
-        subprocess.run(["pip", "install", "-r", "requirements.txt"], check=True)
+        subprocess.run(["uv", "sync"], check=True)
 
         subprocess.run(["systemctl", "restart", "ov-node"], check=True)
 
@@ -117,7 +160,31 @@ def update_ovnode():
         print(Fore.RED + f"Update failed: {e}" + Style.RESET_ALL)
 
 
+def restart_ovnode():
+    if not os.path.exists("/opt/ov-node") and not os.path.exists("/etc/openvpn"):
+        print("OV-Node is not installed.")
+        input("Press Enter to return to the menu...")
+        menu()
+    try:
+        subprocess.run(["systemctl", "restart", "ov-node"], check=True)
+        subprocess.run(["systemctl", "restart", "openvpn-server@server"], check=True)
+        print(
+            Fore.GREEN + "OV-Node and OpenVPN restarted successfully!" + Style.RESET_ALL
+        )
+        input("Press Enter to return to the menu...")
+        menu()
+
+    except Exception as e:
+        print(Fore.RED + f"Restart failed: {e}" + Style.RESET_ALL)
+        input("Press Enter to return to the menu...")
+        menu()
+
+
 def uninstall_ovnode():
+    if not os.path.exists("/opt/ov-node"):
+        print("OV-Node is not installed.")
+        input("Press Enter to return to the menu...")
+        menu()
     try:
         uninstall = input("Do you want to uninstall OV-Node? (y/n): ")
         if uninstall.lower() != "y":
@@ -134,7 +201,7 @@ def uninstall_ovnode():
         bash.expect("Confirm OpenVPN removal")
         bash.sendline("y")
 
-        bash.expect("OpenVPN removed!")
+        bash.expect("OpenVPN and OV-Node removed!")
         print(
             Fore.GREEN
             + "OV-Node uninstallation completed successfully!"
@@ -164,8 +231,8 @@ After=network.target
 
 [Service]
 User=root
-WorkingDirectory=/opt/ov-node/core
-ExecStart=/usr/bin/python3 app.py
+WorkingDirectory=/opt/ov-node/
+ExecStart=/usr/local/bin/uv run main.py
 Restart=always
 RestartSec=5
 Environment="PATH=/usr/local/bin:/usr/bin:/bin"
@@ -196,10 +263,11 @@ def menu():
     print("=" * 34 + Style.RESET_ALL)
     print()
     print("Please choose an option:\n")
-    print("  1. Install OV-Node")
-    print("  2. Update OV-Node")
-    print("  3. Uninstall OV-Node")
-    print("  4. Exit")
+    print("  1. Install")
+    print("  2. Update")
+    print("  3. Restart")
+    print("  4. Uninstall")
+    print("  5. Exit")
     print()
     choice = input(Fore.YELLOW + "Enter your choice: " + Style.RESET_ALL)
 
@@ -208,8 +276,10 @@ def menu():
     elif choice == "2":
         update_ovnode()
     elif choice == "3":
-        uninstall_ovnode()
+        restart_ovnode()
     elif choice == "4":
+        uninstall_ovnode()
+    elif choice == "5":
         print(Fore.GREEN + "\nExiting..." + Style.RESET_ALL)
         sys.exit()
     else:

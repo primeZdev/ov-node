@@ -2,13 +2,13 @@ import pexpect
 import re
 import os
 
-from logger import logger
+from core.logger import logger
 
 
 script_path = "/root/openvpn-install.sh"
 
 
-def create_user_on_server(name, expiry_date) -> bool:
+def create_user_on_server(name) -> bool:
     try:
         if not os.path.exists(script_path):
             logger.error("script not found on ")
@@ -31,6 +31,10 @@ def create_user_on_server(name, expiry_date) -> bool:
         bash.expect(pexpect.EOF, timeout=180)
 
         bash.close()
+        ccd_file = f"/etc/openvpn/ccd/{name}"
+        with open(ccd_file, "w") as f:
+            f.write("")
+
         return True
 
     except pexpect.TIMEOUT:
@@ -111,11 +115,43 @@ def delete_user_on_server(name) -> bool | str:
                 logger.error("Error deleting file %s: %s", file_to_delete, e)
                 return True
 
+        ccd_file = f"/etc/openvpn/ccd/{name}"
+        if os.path.exists(ccd_file):
+            try:
+                os.remove(ccd_file)
+                logger.info("Removed %s", ccd_file)
+            except Exception as e:
+                logger.error("Error deleting file %s: %s", ccd_file, e)
+                return True
+
         return True
 
     except Exception as e:
         logger.exception("Error in delete_user_on_server: %s", e)
         return False
+
+
+def change_user_status(name: str, status: str) -> bool:
+    ccd_file = f"/etc/openvpn/ccd/{name}"
+    if status == "deactivate":
+        if os.path.exists(ccd_file):
+            try:
+                os.remove(ccd_file)
+                logger.info("Removed %s", ccd_file)
+            except Exception as e:
+                logger.error("Error deleting file %s: %s", ccd_file, e)
+                return False
+        return True
+    elif status == "activate":
+        try:
+            os.makedirs("/etc/openvpn/ccd", exist_ok=True)
+            with open(ccd_file, "w") as f:
+                f.write("")
+            logger.info("Created %s", ccd_file)
+            return True
+        except Exception as e:
+            logger.error("Error creating file %s: %s", ccd_file, e)
+            return False
 
 
 async def download_ovpn_file(name: str) -> str | None:

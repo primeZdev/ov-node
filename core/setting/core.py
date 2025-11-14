@@ -1,8 +1,8 @@
 import pexpect
 import re
 
-from logger import logger
-from schema.all_schemas import SetSettingsModel
+from core.logger import logger
+from core.schema.all_schemas import SetSettingsModel
 
 
 def change_config(request: SetSettingsModel) -> bool:

@@ -1,7 +1,7 @@
 from fastapi import Header, HTTPException, status
 
-from config import settings
-from logger import logger
+from core.config import settings
+from core.logger import logger
 
 
 async def check_api_key(key: str = Header(...)) -> str:
