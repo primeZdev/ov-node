@@ -20,12 +20,13 @@ def change_config(request: SetSettingsModel) -> bool:
             config,
             flags=re.MULTILINE,
         )
-        config = re.sub(
-            r"^local\s+.*",
-            f"local {request.tunnel_address}",
-            config,
-            flags=re.MULTILINE,
-        )
+        if request.tunnel_address and request.tunnel_address.strip() != "":
+            config = re.sub(
+                r"^local\s+.*",
+                f"local {request.tunnel_address}",
+                config,
+                flags=re.MULTILINE,
+            )
 
         with open(setting_file, "w") as file:
             file.write(config)
@@ -33,12 +34,22 @@ def change_config(request: SetSettingsModel) -> bool:
         # Update the client template
         with open(template_file, "r") as file:
             template = file.read()
-        template = re.sub(
-            r"^remote\s+\S+\s+\d+",
-            f"remote {request.tunnel_address} {request.ovpn_port}",
-            template,
-            flags=re.MULTILINE,
-        )
+        if request.tunnel_address and request.tunnel_address.strip() != "":
+            # Update both address and port
+            template = re.sub(
+                r"^remote\s+\S+\s+\d+",
+                f"remote {request.tunnel_address} {request.ovpn_port}",
+                template,
+                flags=re.MULTILINE,
+            )
+        else:
+            template = re.sub(
+                r"^remote\s+(\S+)\s+\d+",
+                rf"remote \1 {request.ovpn_port}",
+                template,
+                flags=re.MULTILINE,
+            )
+
         template = re.sub(
             r"^proto\s+\w+",
             f"proto {request.protocol}",

@@ -69,19 +69,15 @@ def install_ovnode():
         bash.close()
         create_ccd()
 
-        with open("/etc/openvpn/server/server.conf", "a") as f:
-            f.write("client-config-dir /etc/openvpn/ccd\n")
-            f.write("ccd-exclusive\n")
-
-        subprocess.run(
-            ["systemctl", "restart", "openvpn-server@server.service"], check=True
-        )
-
         # OV-Node configuration prompts
         shutil.copy(".env.example", ".env")
         example_uuid = str(uuid4())
-        SERVICE_PORT = input("OV-Node service port (default 9090): ") or "9090"
-        API_KEY = input(f"OV-Node API key (example: {example_uuid}): ") or example_uuid
+        SERVICE_PORT = input("OV-Node service port (default 9090): ")
+        if SERVICE_PORT.strip() == "":
+            SERVICE_PORT = "9090"
+        API_KEY = input(f"OV-Node API key (example: {example_uuid}): ")
+        if API_KEY.strip() == "":
+            API_KEY = example_uuid
 
         replacements = {
             "SERVICE_PORT": SERVICE_PORT,
@@ -100,7 +96,7 @@ def install_ovnode():
             f.writelines(lines)
 
         run_ovnode()
-        input("Press Enter to return to the menu...")
+        input("Successfully installed, Press Enter to return to the menu...")
         menu()
 
     except Exception as e:
@@ -201,7 +197,9 @@ def uninstall_ovnode():
         bash.expect("Confirm OpenVPN removal")
         bash.sendline("y")
 
-        bash.expect("OpenVPN and OV-Node removed!")
+        bash.expect(pexpect.EOF, timeout=60)
+        bash.close()
+
         print(
             Fore.GREEN
             + "OV-Node uninstallation completed successfully!"

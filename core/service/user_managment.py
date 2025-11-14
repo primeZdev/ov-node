@@ -137,6 +137,7 @@ def change_user_status(name: str, status: str) -> bool:
         if os.path.exists(ccd_file):
             try:
                 os.remove(ccd_file)
+                restart_openvpn_service()
                 logger.info("Removed %s", ccd_file)
             except Exception as e:
                 logger.error("Error deleting file %s: %s", ccd_file, e)
@@ -148,10 +149,21 @@ def change_user_status(name: str, status: str) -> bool:
             with open(ccd_file, "w") as f:
                 f.write("")
             logger.info("Created %s", ccd_file)
+            restart_openvpn_service()
             return True
         except Exception as e:
             logger.error("Error creating file %s: %s", ccd_file, e)
             return False
+
+
+def restart_openvpn_service() -> bool:
+    try:
+        os.system("systemctl restart openvpn-server@server")
+        logger.info("OpenVPN service restarted successfully.")
+        return True
+    except Exception as e:
+        logger.error(f"Failed to restart OpenVPN service: {e}")
+        return False
 
 
 async def download_ovpn_file(name: str) -> str | None:
