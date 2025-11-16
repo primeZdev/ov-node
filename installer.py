@@ -234,12 +234,13 @@ Description=OV-Node App
 After=network.target
 
 [Service]
-User=root
-WorkingDirectory=/opt/ov-node/
-ExecStart=/usr/local/bin/uv run main.py
+WorkingDirectory=/opt/ov-node
+ExecStart=/opt/ov-node_venv/bin/uv run main.py
 Restart=always
 RestartSec=5
-Environment="PATH=/usr/local/bin:/usr/bin:/bin"
+User=root
+Environment="PATH=/opt/ov-node_venv/bin"
+Environment="VIRTUAL_ENV=/opt/ov-node_venv"
 
 [Install]
 WantedBy=multi-user.target
