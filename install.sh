@@ -22,7 +22,7 @@ source "$VENV_DIR/bin/activate"
 pip install --upgrade pip setuptools wheel
 
 echo -e "${YELLOW}Installing dependencies in venv...${NC}"
-pip install colorama pexpect requests uuid
+pip install colorama pexpect requests uuid uv
 
 # Download repo release
 if [ ! -d "$INSTALL_DIR" ]; then
