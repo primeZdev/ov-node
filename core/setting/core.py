@@ -73,11 +73,15 @@ def restart_openvpn() -> None:
     """Restart the OpenVPN service with systemctl"""
     try:
         logger.info("Restarting OpenVPN service...")
-        # Use pexpect to restart the OpenVPN service
-        child = pexpect.spawn(
-            "systemctl restart openvpn-server@server", encoding="utf-8"
+        import subprocess
+
+        subprocess.run(
+            ["/usr/bin/systemctl", "restart", "openvpn-server@server"],
+            check=True,
+            timeout=30,
         )
-        child.expect(pexpect.EOF)
         logger.info("OpenVPN service restarted successfully.")
+    except subprocess.TimeoutExpired:
+        logger.error("Timeout while restarting OpenVPN service")
     except Exception as e:
         logger.error(f"Error restarting OpenVPN service: {e}")
