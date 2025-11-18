@@ -20,13 +20,6 @@ def change_config(request: SetSettingsModel) -> bool:
             config,
             flags=re.MULTILINE,
         )
-        if request.tunnel_address and request.tunnel_address.strip() != "":
-            config = re.sub(
-                r"^local\s+.*",
-                f"local {request.tunnel_address}",
-                config,
-                flags=re.MULTILINE,
-            )
 
         with open(setting_file, "w") as file:
             file.write(config)
