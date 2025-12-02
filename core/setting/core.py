@@ -1,4 +1,3 @@
-import pexpect
 import re
 
 from core.logger import logger

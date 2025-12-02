@@ -150,8 +150,7 @@ def update_ovnode():
         os.chdir(install_dir)
         subprocess.run(["uv", "sync"], check=True)
 
-        subprocess.run(["systemctl", "restart", "ov-node"], check=True)
-
+        run_ovnode()
         print(Fore.GREEN + "OV-Node updated successfully!" + Style.RESET_ALL)
         input("Press Enter to return to the menu...")
         menu()
@@ -228,6 +227,9 @@ def uninstall_ovnode():
 
 def run_ovnode() -> None:
     """Create and run a systemd service for OV-Node"""
+    path = "/etc/systemd/system/ov-node.service"
+    if os.path.exists(path):
+        os.remove(path)
     service_content = """
 [Unit]
 Description=OV-Node App
@@ -235,15 +237,15 @@ After=network.target
 
 [Service]
 WorkingDirectory=/opt/ov-node
-ExecStart=/opt/ov-node_venv/bin/uv run main.py
+ExecStart=/root/.local/bin/uv run main.py
 Restart=always
 RestartSec=5
 User=root
-Environment="PATH=/opt/ov-node_venv/bin"
-Environment="VIRTUAL_ENV=/opt/ov-node_venv"
+Environment="PATH=/root/.local/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 [Install]
 WantedBy=multi-user.target
+
 """
 
     with open("/etc/systemd/system/ov-node.service", "w") as f:
