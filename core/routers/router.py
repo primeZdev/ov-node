@@ -15,7 +15,7 @@ from core.setting.core import change_config
 router = APIRouter(prefix="/sync", tags=["node_sync"])
 
 
-@router.post("/get-status", response_model=ResponseModel)
+@router.get("/status", response_model=ResponseModel)
 async def get_status(request: SetSettingsModel, api_key: str = Depends(check_api_key)):
     """Get the current status of the node and set ovpn settings"""
     if request.set_new_setting:
@@ -37,7 +37,7 @@ async def get_status(request: SetSettingsModel, api_key: str = Depends(check_api
     )
 
 
-@router.post("/create-user", response_model=ResponseModel)
+@router.post("/user", response_model=ResponseModel)
 async def create_user(user: User, api_key: str = Depends(check_api_key)):
     success = create_user_on_server(user.name)
     if success:
@@ -49,19 +49,19 @@ async def create_user(user: User, api_key: str = Depends(check_api_key)):
     return ResponseModel(success=False, msg="Failed to create user")
 
 
-@router.post("/delete-user", response_model=ResponseModel)
-async def delete_user(user: User, api_key: str = Depends(check_api_key)):
-    result = delete_user_on_server(user.name)
+@router.delete("/user/{name}", response_model=ResponseModel)
+async def delete_user(name: str, api_key: str = Depends(check_api_key)):
+    result = delete_user_on_server(name)
     if result:
         return ResponseModel(
             success=True,
             msg="User deleted successfully",
-            data={"client_name": user.name},
+            data={"client_name": name},
         )
     return ResponseModel(success=False, msg="Failed to delete user")
 
 
-@router.post("/change-user-status", response_model=ResponseModel)
+@router.put("/user", response_model=ResponseModel)
 async def change_user_status(user: User, api_key: str = Depends(check_api_key)):
     result = change_user_status_on_server(user.name, user.status)
     if result:
