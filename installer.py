@@ -20,12 +20,17 @@ def create_ccd() -> None:
 
         ccd_line = f"client-config-dir {ccd_dir}\n"
         ccd_exclusive_line = "ccd-exclusive\n"
+        statuses = "status /var/log/openvpn-status.log 10"
 
         if ccd_line not in lines:
             lines.append("\n" + ccd_line)
 
         if ccd_exclusive_line not in lines:
             lines.append(ccd_exclusive_line)
+
+        if statuses not in lines:
+            lines.append(statuses)
+
         with open(server_conf, "w") as f:
             f.writelines(lines)
 
@@ -41,7 +46,8 @@ def install_ovnode():
         menu()
     try:
         subprocess.run(
-            ["wget", "https://git.io/vpn", "-O", "/root/openvpn-install.sh"], check=True
+            ["wget", "-4", "https://git.io/vpn", "-O", "/root/openvpn-install.sh"],
+            check=True,
         )  # thanks to Nyr for ovpn installation script <3 https://github.com/Nyr/openvpn-install
 
         bash = pexpect.spawn(
@@ -100,7 +106,9 @@ def install_ovnode():
             f.writelines(lines)
 
         run_ovnode()
-        input("Successfully installed, Press Enter to return to the menu...")
+        input(
+            f"Successfully installed,\nApi key= {API_KEY}\nPort= {SERVICE_PORT}\nPress Enter to return to the menu..."
+        )
         menu()
 
     except Exception as e:

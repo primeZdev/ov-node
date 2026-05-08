@@ -8,6 +8,7 @@ from core.service.user_managment import (
     change_user_status as change_user_status_on_server,
     delete_user_on_server,
     download_ovpn_file,
+    get_users_usage
 )
 from core.setting.core import change_config
 
@@ -35,6 +36,14 @@ async def get_status(request: SetSettingsModel, api_key: str = Depends(check_api
     return ResponseModel(
         success=True, msg="Node status retrieved successfully", data=status
     )
+
+@router.get("/usage", response_model=ResponseModel)
+async def get_all_user_usage(api_key: str = Depends(check_api_key)):
+    usages = get_users_usage()
+    if usages:
+        return ResponseModel(success=True, msg="Latest user usage received", data=usages) 
+    return ResponseModel(success=False, msg="No user is using it.",)
+
 
 
 @router.post("/user", response_model=ResponseModel)
