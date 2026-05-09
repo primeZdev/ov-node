@@ -3,6 +3,7 @@ import re
 import os
 
 from core.logger import logger
+from core.schema.all_schemas import UsersUsage
 
 
 script_path = "/root/openvpn-install.sh"
@@ -174,3 +175,27 @@ async def download_ovpn_file(name: str) -> str | None:
     else:
         create_user_on_server(name)
         return await download_ovpn_file(name)
+
+
+def get_users_usage() -> UsersUsage | None:
+    users = {}
+    file_path = "/var/log/openvpn-status.log"
+    with open(file_path) as f:
+        lines = f.readlines()
+
+    for line in lines:
+        line = line.strip()
+        if line.startswith("CLIENT_LIST") and not line.startswith(
+            "CLIENT_LIST,Common Name"
+        ):
+            parts = line.split(",")
+            username = parts[1]
+            bytes_received = int(parts[5])
+            bytes_sent = int(parts[6])
+            total_bytes = bytes_received + bytes_sent
+            users[username] = total_bytes
+
+    if users:
+        return UsersUsage(users=users)
+    else:
+        return None

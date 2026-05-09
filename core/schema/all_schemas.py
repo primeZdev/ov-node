@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import Any, Optional
+from typing import Any, Optional, Dict
 
 
 class User(BaseModel):
@@ -18,3 +18,6 @@ class SetSettingsModel(BaseModel):
     protocol: str
     ovpn_port: int
     set_new_setting: bool
+
+class UsersUsage(BaseModel):
+    users: Dict[str, float]
