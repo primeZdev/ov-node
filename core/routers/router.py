@@ -42,7 +42,7 @@ async def get_all_user_usage(api_key: str = Depends(check_api_key)):
     usages = get_users_usage()
     if usages:
         return ResponseModel(success=True, msg="Latest user usage received", data=usages) 
-    return ResponseModel(success=False, msg="No user is using it.",)
+    return ResponseModel(success=True, msg="No user is using it.",)
 
 
 
