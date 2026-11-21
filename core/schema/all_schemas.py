@@ -36,3 +36,9 @@ class SetSettingsModel(BaseModel):
 
 class UsersUsage(BaseModel):
     users: Dict[str, float]
+
+
+class LogQueryParams(BaseModel):
+    lines: int = Field(default=100, ge=1, le=5000, description="Number of lines to return")
+    follow: bool = Field(default=False, description="Stream new lines in real-time (SSE)")
+    level: Optional[str] = Field(default=None, description="Filter by log level (DEBUG, INFO, WARNING, ERROR)")

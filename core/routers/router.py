@@ -1,7 +1,9 @@
-from fastapi import APIRouter, Depends
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, Query
+from fastapi.responses import FileResponse, StreamingResponse
 import psutil
-from core.schema.all_schemas import User, ResponseModel, SetSettingsModel
+import asyncio
+import os
+from core.schema.all_schemas import User, ResponseModel, SetSettingsModel, LogQueryParams
 from core.auth.auth import check_api_key
 from core.service.user_managment import (
     create_user_on_server,
@@ -11,6 +13,7 @@ from core.service.user_managment import (
     get_users_usage
 )
 from core.setting.core import change_config
+from core.logger import LOG_FILE
 
 
 router = APIRouter(prefix="/sync", tags=["node_sync"])
@@ -43,7 +46,6 @@ async def get_all_user_usage(api_key: str = Depends(check_api_key)):
     if usages:
         return ResponseModel(success=True, msg="Latest user usage received", data=usages) 
     return ResponseModel(success=True, msg="No user is using it.",)
-
 
 
 @router.post("/user", response_model=ResponseModel)
@@ -93,3 +95,75 @@ async def download_ovpn(client_name: str, api_key: str = Depends(check_api_key))
         )
     else:
         return ResponseModel(success=False, msg="OVPN file not found", data=None)
+
+
+def _read_log_lines(file_path: str, lines: int, level_filter: str | None = None) -> list[str]:
+    """Read last N lines from log file, optionally filtered by level."""
+    if not os.path.exists(file_path):
+        return []
+    
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            all_lines = f.readlines()
+    except Exception:
+        return []
+    
+    result = []
+    for line in reversed(all_lines):
+        if level_filter and level_filter.upper() not in line.upper():
+            continue
+        result.append(line.rstrip("\n"))
+        if len(result) >= lines:
+            break
+    
+    return list(reversed(result))
+
+
+async def _log_stream_generator(file_path: str, level_filter: str | None = None):
+    """Generate SSE events for real-time log streaming."""
+    initial_lines = _read_log_lines(file_path, 50, level_filter)
+    for line in initial_lines:
+        yield f"data: {line}\n\n"
+    
+    try:
+        with open(file_path, "r", encoding="utf-8") as f:
+            f.seek(0, os.SEEK_END)
+            while True:
+                line = f.readline()
+                if line:
+                    if level_filter and level_filter.upper() not in line.upper():
+                        continue
+                    yield f"data: {line.rstrip()}\n\n"
+                else:
+                    await asyncio.sleep(0.5)
+    except Exception:
+        return
+
+
+@router.get("/logs")
+async def get_logs(
+    params: LogQueryParams = Depends(),
+    api_key: str = Depends(check_api_key)
+):
+    """
+    Get node logs.
+    - If follow=false: returns last N lines as JSON
+    - If follow=true: streams new lines via Server-Sent Events (SSE)
+    """
+    if params.follow:
+        return StreamingResponse(
+            _log_stream_generator(LOG_FILE, params.level),
+            media_type="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            }
+        )
+    
+    lines = _read_log_lines(LOG_FILE, params.lines, params.level)
+    return ResponseModel(
+        success=True,
+        msg=f"Retrieved {len(lines)} log lines",
+        data={"lines": lines, "total_lines": len(lines)}
+    )
