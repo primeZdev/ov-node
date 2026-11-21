@@ -8,8 +8,18 @@ from core.schema.all_schemas import UsersUsage
 
 script_path = "/root/openvpn-install.sh"
 
+USERNAME_PATTERN = re.compile(r'^[a-zA-Z0-9_-]{1,64}$')
 
-def create_user_on_server(name) -> bool:
+
+def _validate_username(name: str) -> bool:
+    return bool(USERNAME_PATTERN.match(name))
+
+
+def create_user_on_server(name: str) -> bool:
+    if not _validate_username(name):
+        logger.error(f"Invalid username: {name}")
+        return False
+
     try:
         if not os.path.exists(script_path):
             logger.error("script not found on ")
@@ -49,7 +59,11 @@ def create_user_on_server(name) -> bool:
         return False
 
 
-def delete_user_on_server(name) -> bool | str:
+def delete_user_on_server(name: str) -> bool:
+    if not _validate_username(name):
+        logger.error(f"Invalid username: {name}")
+        return False
+
     try:
         if not os.path.exists(script_path):
             logger.error("script not found at %s", script_path)
@@ -89,7 +103,7 @@ def delete_user_on_server(name) -> bool | str:
         if not user_number:
             logger.error("User '%s' not found for delete!", name)
             bash.close(force=True)
-            return "not_found"
+            return False
 
         logger.info("Revoking user '%s' -> number %s", name, user_number)
         bash.sendline(user_number)
@@ -114,7 +128,6 @@ def delete_user_on_server(name) -> bool | str:
                 logger.info("Removed %s", file_to_delete)
             except Exception as e:
                 logger.error("Error deleting file %s: %s", file_to_delete, e)
-                return True
 
         ccd_file = f"/etc/openvpn/ccd/{name}"
         if os.path.exists(ccd_file):
@@ -123,7 +136,6 @@ def delete_user_on_server(name) -> bool | str:
                 logger.info("Removed %s", ccd_file)
             except Exception as e:
                 logger.error("Error deleting file %s: %s", ccd_file, e)
-                return True
 
         return True
 
@@ -133,6 +145,10 @@ def delete_user_on_server(name) -> bool | str:
 
 
 def change_user_status(name: str, status: str) -> bool:
+    if not _validate_username(name):
+        logger.error(f"Invalid username: {name}")
+        return False
+
     ccd_file = f"/etc/openvpn/ccd/{name}"
     if status == "deactivate":
         if os.path.exists(ccd_file):
@@ -155,6 +171,9 @@ def change_user_status(name: str, status: str) -> bool:
         except Exception as e:
             logger.error("Error creating file %s: %s", ccd_file, e)
             return False
+    else:
+        logger.error(f"Invalid status: {status}")
+        return False
 
 
 def restart_openvpn_service() -> bool:
@@ -167,14 +186,26 @@ def restart_openvpn_service() -> bool:
         return False
 
 
-async def download_ovpn_file(name: str) -> str | None:
+async def download_ovpn_file(name: str, max_retries: int = 2) -> str | None:
     """This function returns the path of the ovpn file for downloading"""
+    if not _validate_username(name):
+        logger.error(f"Invalid username: {name}")
+        return None
+
     file_path = f"/root/{name}.ovpn"
     if os.path.exists(file_path):
         return file_path
-    else:
-        create_user_on_server(name)
-        return await download_ovpn_file(name)
+
+    if max_retries <= 0:
+        logger.error(f"Max retries exceeded for user {name}")
+        return None
+
+    success = create_user_on_server(name)
+    if not success:
+        logger.error(f"Failed to create user {name}")
+        return None
+
+    return await download_ovpn_file(name, max_retries - 1)
 
 
 def get_users_usage() -> UsersUsage | None:
